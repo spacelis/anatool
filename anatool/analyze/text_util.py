@@ -9,7 +9,6 @@ __version__ = '0.1.0'
 __author__ = 'SpaceLis'
 
 import re
-from whoosh.analysis import StemmingAnalyzer, StandardAnalyzer
 
 _PATTERN_4SQ = [ re.compile(r'\sSt\.\s|\sRd\.\s'),
                 re.compile(r'I\'m at.*?(?<!.\.\w|.\s\w)\.\s+'),
@@ -20,14 +19,15 @@ _COMMA = re.compile(r',')
 _CSV = re.compile(r'"|,|\n|\r')
 _SPACE = re.compile(r'\s+')
 _NAMES = re.compile(r'\'|"|\(|\)|\s+|,')
-_HTML = re.compile(r'<.*?>|&.*?;')
+_LINEBREAK = re.compile(r'\n|\r')
+_HTML = [re.compile(r'<style.*?</style>'),
+        re.compile(r'<script.*?</script>'),
+        re.compile(r'<.*?>'),
+        #re.compile(r'<(?!(?:a\s|/a|!))[^>]*>'),
+        re.compile(r'&.*?;')]
 
 _ASIANCHAR = re.compile(u'[\u2E80-\u9FFF]')
 
-_ANALYZER = StemmingAnalyzer()
-# Alternative analyzer could be used
-#from anatool.analyze.stopwords import STOPWORDS_RANKSNL_LONG
-#_ANALYZER = StandardAnalyzer(stoplist = STOPWORDS_RANKSNL_LONG)
 
 
 #------------------------------------------------------ Filters
@@ -60,7 +60,11 @@ def name_filter(line):
 def html_filter(line):
     """Remove all HTML tags and escaped symbols
     """
-    line, dummy = _HTML.subn(r'', line)
+    line, dummy = _LINEBREAK.subn(r'', line)
+    line, dummy = _SPACE.subn(r' ', line)
+    for ptn in _HTML:
+        line, dummy = ptn.subn(r'', line)
+    line, dummy = _SPACE.subn(r' ', line)
     return line
 
 #------------------------------------------------------ Utils
@@ -88,33 +92,17 @@ def geo_rect(pnt1, pnt2):
     return ' GeomFromText(\'Polygon(({0} {1}, {0} {3}, {2} {3}, {2} {1}, {0} {1}))\')'\
         .format(_p1[0], _p1[1], _p2[0], _p2[1])
 
-#------------------------------------------------------ Tokenization
-def get_tokens(line):
-    """ return the token list of the line
+def testHTML():
+    """docstring for testHTML
     """
-    line = fourq_filter(line)
-    line = to_unicode(line)
-    tokens = [token.text for token in _ANALYZER(line)]
-    return tokens
-
-def token_freq(token_lst):
-    """Return the token distribution"""
-    dist = dict()
-    for t in token_lst:
-        if not dist.has_key(t):
-            dist[t] = 1
-        else:
-            dist[t] += 1
-    return dist
-
-def line2tf(line):
-    """shortcut for token_freq(get_tokens())"""
-    return token_freq(get_tokens(line))
-
-def lines2tfidf(lines):
-    """Construct a dataset of tfidf vectors from a set of string
-    """
-    #FIXME implement the code
+    import json
+    fin = open(r'..\..\data\web-06_05_2011-10_29_43.ljson')
+    fout = open(r'test.txt', 'w')
+    for line in fin:
+        web = json.loads(line)['web']
+        print >>fout, html_filter(web).encode('utf-8', errors='ignore')
+        #print >>fout, web.encode('utf-8', errors='ignore')
+        break
 
 
 if __name__ == '__main__':
@@ -125,5 +113,5 @@ if __name__ == '__main__':
     print comma_filter('haha there is,  , a ,lot,,of coma,')
     print has_asianchar(u'我爱中国')
     print geo_rect((1,2), (2,3))
-    print html_filter('<tag> &gt; some &lt; </tag> haha')
-
+    print html_filter('<style> teststest </style> <script> adsfeadfsdf </script><!-- adfsdfeaf >')
+    testHTML()

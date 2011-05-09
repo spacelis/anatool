@@ -11,10 +11,11 @@ History:
 __version__ = '0.2.2'
 __author__ = 'SpaceLis'
 
-import random
+import random, json
 from anatool.dm.db import CONN_POOL, GEOTWEET
-from anatool.analyze.text_util import line2tf, comma_filter, fourq_filter, geo_rect
+from anatool.analyze.text_util import geo_rect
 
+#---------------------------------------------------------- List Operators
 def rand_select(cnt, ratio):
     """Generate two list of random numbers below cnt, the length of
     the two lists are at the ratio"""
@@ -30,160 +31,94 @@ def ratio_select(cnt, ratio):
 def list_split(lst, cnt):
     """splite list into cnt parts"""
     pivot = list()
-    l = len(lst) / cnt
-    p = 0
-    for i in range(cnt - 1):
-        pivot.append(lst[p:p+l])
-        p += l
-    pivot.append(lst[p:])
+    length = len(lst) / cnt
+    pos = 0
+    for idx in range(cnt - 1):
+        pivot.append(lst[pos:pos+length])
+        pos += length
+    pivot.append(lst[pos:])
     return pivot
 
-
-class Dataset(list):
-    """Keep a list of dict object"""
+#---------------------------------------------------------- Dataset
+class Dataset(dict):
+    """Dataset is a column oriented data storage. The key is the title of the
+    column while the value is the list of data in the column (key) in a
+    sequential order.
+    """
     def __init__(self, *arg, **karg):
         super(Dataset, self).__init__(*arg, **karg)
+        self._size = 0
+        self.sortedkey = None
 
-    def gen_arff(self, dst, key_lst=None, \
-            typemap=dict({'__CLASS__': 'DISC'}), \
-            default_type = 'NUMERIC'):
-        """Generate arff file for WEKA"""
-        farff = open(dst, 'w')
-        print >> farff, '@Relation {0}'.format(dst)
+    def size(self):
+        """the size of the dataset, i.e., the number of rows
+        """
+        return self._size
 
-        #Build the universe term set
-        if key_lst == None:
-            key_set = set()
-            for twt in self:
-                for key in twt.iterkeys():
-                    key_set.add(key)
-            key_lst = sorted(key_set)
+    def append(self, item):
+        """Add a new data item into the dataset
+        This is just for mocking list().append()
+        """
+        for key in item:
+            if key not in self:
+                self[key] = [0 for idx in range(0, self._size)]
+            self[key].append(item[key])
+        self._size += 1
 
-        #Build the universe class set
-        dis_lst = dict()
-        for key in key_lst:
-            if typemap.get(key, default_type) == 'DISC':
-                dis_lst[key] = set()
-        for item in self:
-            for key in dis_lst.iterkeys():
-                if item[key] not in dis_lst[key]:
-                    dis_lst[key].add(item[key])
+    def extend(self, itemlist):
+        """Extend the dataset with the itemlist
+        This is just for mocking list().extend()
+        """
+        for item in itemlist:
+            self.append(item)
 
-        #Generate column description
-        for key in key_lst:
-            if typemap.get(key, default_type) == 'DISC':
-                print >> farff, '@ATTRIBUTE {0}\t{{'.format(key),
-                print >> farff, ', '.join(val for val in dis_lst[key]),
-                print >> farff, '}'
-            else:
-                print >> farff, '@ATTRIBUTE {0}\t{1}'.\
-                        format(key, typemap.get(key, default_type))
-
-        #Generate dataset
-        print >> farff, '@DATA'
-        for item in self:
-            print >> farff, ', '.join(str(item.get(key, 0)) for key in key_lst)
-
-        farff.flush()
-        farff.close()
-
-    def gen_crs_arff(self, dst, fold, key_lst=None, \
-            typemap=dict({'__CLASS__': 'DISC'}), \
-            default_type = 'NUMERIC'):
-        """generate dataset for cross validation"""
-        cls = dict()
-        for i in range(len(self)):
-            if self[i]['__CLASS__'] not in cls:
-                cls[self[i]['__CLASS__']] = dict()
-                cls[self[i]['__CLASS__']]['list'] = list()
-            cls[self[i]['__CLASS__']]['list'].append(i)
-        for c in cls.iterkeys():
-            random.shuffle(cls[c]['list'])
-            cls[c]['fold'] = list_split(cls[c]['list'], fold)
-        for i in range(fold):
-            test = Dataset()
-            train = Dataset()
-            for c in cls.iterkeys():
-                test.extend([self[f] for f in cls[c]['fold'][i]])
-                for j in range(fold):
-                    if j != i:
-                        train.extend([self[f] for f in cls[c]['fold'][j]])
-            test.gen_arff('{0}.test.{1}.arff'.format(dst, i), key_lst, \
-                    typemap, default_type)
-            train.gen_arff('{0}.train.{1}.arff'.format(dst, i), key_lst, \
-                    typemap, default_type)
-
-
-    def bgdist(self):
-        """get the back ground distribution"""
-        bgdist = DataItem()
-        for vec in self:
-            for key in vec.iterkeys():
-                if key in bgdist:
-                    bgdist[key] += vec[key]
-                else:
-                    bgdist[key] = vec[key]
-        return bgdist
-
-    def distinct(self, column):
-        """Return the value set of the column"""
+    def distinct(self, key):
+        """Return the value set of the key
+        """
         vset = set()
-        for vec in self:
-            vset.add(vec[column])
+        for val in self[key]:
+            vset.add(val)
         return [val for val in vset]
 
-    def groupfunc(self, column, func):
-        """Return the output of a function to the values grouped by column"""
+    def groupfunc(self, key, pkey, func):
+        """Return the output of a function to the values grouped by key
+        """
         rst = DataItem()
-        self = sorted(self, key=lambda x:x[column])
+        if self.sortedkey == key:
+            indices = range(0, self._size)
+        else:
+            indices = sorted(indices, key=lambda x:self[key][x])
         temp = list()
-        col_val = ''
-        for vec in self:
-            if col_val != vec[column]:
-                if len(temp)>0: rst[col_val] = func(temp)
+        idx_val = type(self[key][0]).__init__()
+        for idx in indices:
+            if idx_val != self[key][idx]:
+                if len(temp)>0:
+                    rst[idx_val] = func(temp)
                 temp = list()
-                col_val = vec[column]
-            temp.append(vec)
-        rst[col_val] = func(temp)
+                idx_val = self[key][idx]
+            temp.append(self[pkey][idx])
+        rst[idx_val] = func(temp)
         return rst
 
-    def idf(self):
-        """get the idf distribution"""
-        idfdist = dict()
-        for vec in self:
-            for key in vec.iterkeys():
-                if key in idfdist:
-                    idfdist[key] += 1
-                else:
-                    idfdist[key] = 1
-        return idfdist
+    def merge(self, dset):
+        """Merge the keys and values into this Dataset
+        """
+        if self._size != dset._size:
+            raise TypeError, "size doesn't match"
+        for key in dset:
+            if key not in self:
+                self[key] = dset[key]
+            else:
+                raise TypeError, "Key conflicting"
 
+    #def __str__(self):
+        #"""generate string represent this obj
+        #"""
+        #resstr = str()
+        #for key in self:
+            #resstr += key + ':' + self[key] + '\n'
+        #return resstr
 
-def loadrows(config, cols, wheres=None, table='sample', other=''):
-    """Load tweets to list on conditions"""
-    query = 'SELECT ' +  \
-            ((', '.join(cols)) if cols!='*' else '*') \
-            + ' FROM ' + table + \
-            ((' WHERE ' + ' AND '.join(wheres)) if wheres else '') \
-            + other
-    cur = CONN_POOL.get_cur(config)
-    print query
-    cur.execute(query)
-    res = Dataset()
-    for row in cur:
-        twt = dict()
-        for key in cols:
-            twt[key] = row[key]
-        res.append(twt)
-    print 'Count: {0}'.format(cur.rowcount)
-    return res
-
-def qloadrows(config, query):
-    """Load tweets to list on conditions"""
-    cur = CONN_POOL.get_cur(config)
-    print query
-    cur.execute(query)
-    return Dataset([row for row in cur])
 
 class PartialIterator(object):
     """Iterator by an index list"""
@@ -212,7 +147,6 @@ class PartialIterator(object):
         """Make it iterative"""
         return self
 
-
 class DataItem(dict):
     """Keeps data"""
     def __init__(self, *arg, **karg):
@@ -226,6 +160,41 @@ class DataItem(dict):
                 self[key] += src[key]
             else:
                 self[key] = src[key]
+
+    #def __str__(self):
+        #"""generate json string for this object
+        #"""
+        #resstr = str()
+        #for key in self:
+            #resstr += key + ':' + self[key] + '\n'
+        #return resstr
+
+#---------------------------------------------------------- Database Access
+def loadrows(config, cols, wheres=None, table='sample', other=''):
+    """Load tweets to list on conditions"""
+    query = 'SELECT ' +  \
+            ((', '.join(cols)) if cols!='*' else '*') \
+            + ' FROM ' + table + \
+            ((' WHERE ' + ' AND '.join(wheres)) if wheres else '') \
+            + other
+    cur = CONN_POOL.get_cur(config)
+    print query
+    cur.execute(query)
+    res = Dataset()
+    for row in cur:
+        twt = dict()
+        for key in cols:
+            twt[key] = row[key]
+        res.append(twt)
+    print 'Count: {0}'.format(cur.rowcount)
+    return res
+
+def qloadrows(config, query):
+    """Load tweets to list on conditions"""
+    cur = CONN_POOL.get_cur(config)
+    print query
+    cur.execute(query)
+    return Dataset([row for row in cur])
 
 def place_name(pid, dbconf):
     """Return place name given a pid"""
@@ -267,16 +236,10 @@ def load_by_region(region):
             ('id', 'place_id', 'text', 'lat', 'lng'),
             ('MBRContains({0}, geo)'.format(geo_rect(*region)),))
 
-def test():
-    """Test this unit"""
-    twt_lst = loadrows(GEOTWEET, ('place_id', 'text'),
-            ('MBRContains({0}, geo)'.format(\
-                    geo_rect((40.75,-74.02),(40.70,-73.97))),))
-    twt_lst.gen_arff('test.arff', {'text': 'TEXT', 'place_id': 'DISC'})
-
 if __name__ == '__main__':
     #region2arff('test.arff', ((40.75,-74.02),(40.70,-73.97)))
-    #d = Dataset([{'id':'a', 'val':1}, {'id':'b', 'val':1}, {'id':'a', 'val':2}])
+    #d = Dataset([{'id':'a', 'val':1},
+    #{'id':'b', 'val':1}, {'id':'a', 'val':2}])
     #print d
     #print d.groupfunc('id', len)
     print list_split([1,2,3,4,5,6,7,8,9], 4)

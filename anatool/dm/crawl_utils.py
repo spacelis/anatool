@@ -11,13 +11,13 @@ History:
 
 """
 
-import json, re, logging, fileinput, gzip, time, os
+import json, re, logging, fileinput, gzip, time, os, sys
 import _mysql_exceptions
+import traceback
 from anatool.dm.log_helper import LogFunction
-from anatool.dm.db import GEOTWEET
-from anatool.dm.db import CONN_POOL
-from dataset import loadrows
-from analyze.text_util import get_tokens
+from anatool.dm.db import GEOTWEET, CONN_POOL
+from anatool.analyze.dataset import loadrows
+from anatool.analyze.text_util import get_tokens, html_filter
 
 def named(name, ext):
     """rename the file if there is a file in the same name
@@ -108,7 +108,7 @@ def im_tweet(srcs):
         except _mysql_exceptions.IntegrityError:
             print 'Import Tweets::Tweet ID {0} ignored for duplication.'\
                     .format(tjson['id'])
-        except StandardError as err:
+        except StandardError:
             print 'Fail at line {0}'.format(k)
     logging.info('Import Tweet::{0} out of {1} imported.'.format(i, k))
     logging.info('------------------------------------------')
@@ -362,7 +362,7 @@ def filter_picURL(dst, srcs):
                                 + str(jtwt['id']) + '$' \
                                 + ','.join(ht)
                         k += 1
-        except Exception as e:
+        except Exception:
             pass
     logging.info('{0} URLs out of {1} tweets'.format(k, i))
 
@@ -382,18 +382,44 @@ def gen_urls(dst, srcs):
     """generate url to web pages list for crawling
     """
     fdst = open(dst, 'w')
-    k, i = 0, 0
+    k = 0
     for line in fileinput.input(srcs, openhook = fileinput.hook_compressed):
         jlist = json.loads(line)
         for entry in jlist['gresults']:
-            print >> fdst, u'$'.join((jlist['q'],entry['Url'])).encode('utf-8')
+            print >> fdst, u'$'.join((jlist['q'], entry['Url'])).encode('utf-8')
+            k += 1
+    print '{0} URLs generated'.format(k)
     fdst.close()
 
+
+@LogFunction('Importing webpages')
+def im_webpage(srcs):
+    """ Import web pages from file to database.
+    """
+    # Connect to MySQL database
+    cur = CONN_POOL.get_cur(GEOTWEET)
+    i, k = 0, 0
+    for line in fileinput.input(srcs, openhook = fileinput.hook_compressed):
+        try:
+            k += 1
+            tjson = json.loads(line)
+            item = (tjson['q'], \
+                    html_filter(tjson['web']))
+            cur.execute('INSERT INTO web ( \
+                    place_id, \
+                    web) \
+                    VALUES(%s,%s)', item)
+            i += 1
+        except StandardError:
+            print 'Fail at line {0}'.format(k)
+            print traceback.print_exc(file=sys.stdout)
+    logging.info('Import web pages::{0} out of {1} imported.'.format(i, k))
+    logging.info('------------------------------------------')
 
 if __name__ == '__main__':
 
     logging.basicConfig( \
-        filename= '../log/process.log', \
+        filename= '../../log/process.log', \
         level=logging.INFO, \
         format='%(asctime)s::%(levelname)s::%(message)s')
     CONSOLE = logging.StreamHandler()
@@ -403,7 +429,14 @@ if __name__ == '__main__':
 
     # running scripts
     #process(('../data/tweet-26_04_2011-17_29_29.ljson.gz',))
-    gen_urls('../data/list/web_rd1.lst', ('../data/websearch_b-28_04_2011-15_47_28.ljson',))
+    #gen_urls('../data/list/web_rd1.lst', ('../data/websearch_b-28_04_2011-15_47_28.ljson',))
+    #im_webpage(('../../data/web_f.ljson','../../data/web-06_05_2011-10_29_43.ljson.gz'))
+
+
+
+
+
+
     #filter_poi('../data/poi_rd15.ljson', \
             #('../data/tweet_g-15_04_2011-14_51_39.ljson.gz', ))
             #('../data/tweet_u-28_03_2011-15_39_49.ljson.gz',))
