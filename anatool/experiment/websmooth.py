@@ -72,14 +72,14 @@ def web_based_guess():
             rank.append((place_name(pid_web), kl_divergence(lmweb[pid_web], lmtwt[pid_twt])))
         score[place_name(pid_twt)] = sorted(rank, key=itemgetter(1), reverse=False)
 
+    score.write2csv('rank.lst', False)
 
-    # output the outcome
-    score.write2csv('rank.lst')
-
-def evaluation():
-    """docstring for evaluation
-    """
-    pass
+    #fout = open('rank2.lst', 'w')
+    #for pid_twt in lmtwt.iterkeys():
+        #print >> fout, place_name(pid_twt, GEOTWEET)
+        #for item in score[pid_twt]:
+            #print >> fout, '({0}, {1}),'.format(place_name(item[0], GEOTWEET), item[1]),
+        #print >> fout
 
 def expr():
     web_based_guess()

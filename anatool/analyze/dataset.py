@@ -125,14 +125,15 @@ class Dataset(dict):
     def write2csv(self, filename, transposed = False):
         """ write this dataset into a csv file
         """
+        keys = [key for key in self.iterkeys()]
         with open(filename, 'wb') as fout:
             csvwriter = csv.writer(fout, delimiter=';', quotechar='`')
             if not transposed:
-                csvwriter.writerow([key for key in self.iterkeys()])
+                csvwriter.writerow([key for key in keys])
                 for item in self:
-                    csvwriter.writerow([item[key] for key in item.iterkeys()])
+                    csvwriter.writerow([item[key] for key in keys])
             else:
-                for key in self.iterkeys():
+                for key in keys:
                     csvwriter.writerow([key, ] + self[key])
 
 
