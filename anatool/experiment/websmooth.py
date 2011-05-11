@@ -14,6 +14,7 @@ import csv
 from anatool.dm.db import CONN_POOL, GEOTWEET
 from anatool.analyze.dataset import place_name
 from anatool.analyze.lm import lmfromtext, kl_divergence
+from operator import itemgetter
 
 def lm_comp():
     """ This function compares between the LMs from web pages and tweets hot places.
@@ -44,9 +45,45 @@ def lm_comp():
             kl_divergence(lmtwt, lmref), len(lmtwt), len(lmtwt)])
 
 def web_based_guess():
+    """This experiment rank the place by comparing LM from webs to LM from tweets
+    """
+    cur = CONN_POOL.get_cur(GEOTWEET)
+    fin = open('../../data/list/sample_dist_100.csv')
+
+    #load text and build LM for both tweets and web pages
+    lmweb = dict()
+    lmtwt = dict()
+    for place_id in fin:
+        place_id = place_id.strip()
+        cur.execute('select web from web where place_id = \'{0}\''.format(place_id))
+        text_web = [row['web'] for row in cur]
+        lmweb[place_id] = lmfromtext(text_web)
+
+        cur.execute('select text from sample where place_id = \'{0}\' order by rand()'.format(place_id))
+        text_twt = [row['text'] for row in cur]
+        lmtwt[place_id] = lmfromtext(text_twt)
+
+    # calculate the KLD for each pair of tweets and web pages
+    # and rank the lmweb
+    score = dict()
+    for pid_twt in lmtwt.iterkeys():
+        rank = list()
+        for pid_web in lmweb.iterkeys():
+            rank.append((pid_web, kl_divergence(lmweb[pid_web], lmtwt[pid_twt])))
+        score[pid_twt] = sorted(rank, key=itemgetter(1), reverse=False)
+
+
+    # give the outcome
+    fout = open('rank.lst', 'w')
+    for pid_twt in lmtwt.iterkeys():
+        print >> fout, place_name(pid_twt, GEOTWEET)
+        for item in score[pid_twt]:
+            print >> fout, '({0}, {1}),'.format(place_name(item[0], GEOTWEET), item[1]),
+        print >> fout
+
 
 def expr():
-    lm_comp()
+    web_based_guess()
 
 if __name__ == '__main__':
     expr()

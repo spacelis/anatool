@@ -59,7 +59,7 @@ class Dataset(dict):
         """Add a new data item into the dataset
         This is just for mocking list().append()
         """
-        for key in item:
+        for key in item.iterkeys():
             if key not in self:
                 self[key] = [0 for idx in range(0, self._size)]
             self[key].append(item[key])
@@ -105,20 +105,25 @@ class Dataset(dict):
         """
         if self._size != dset._size:
             raise TypeError, "size doesn't match"
-        for key in dset:
+        for key in dset.iterkeys():
             if key not in self:
                 self[key] = dset[key]
             else:
                 raise TypeError, "Key conflicting"
 
-    #def __str__(self):
-        #"""generate string represent this obj
-        #"""
-        #resstr = str()
-        #for key in self:
-            #resstr += key + ':' + self[key] + '\n'
-        #return resstr
+    def item(self, idx):
+        """Return the item at the position idx
+        """
+        rst = DataItem()
+        for key in self.iterkeys():
+            rst[key] = self[key][idx]
+        return rst
 
+    def __iter__(self):
+        """Iterating items in the dataset
+        """
+        for idx in range(self._size):
+            yield self.item(idx)
 
 class PartialIterator(object):
     """Iterator by an index list"""
@@ -127,47 +132,23 @@ class PartialIterator(object):
         self._dset, self._idc = dset, idc
         self._idx = 0
 
-    def next(self):
-        """Return the next element in the iterating list"""
-        if self._idx >= len(self._idc):
-            raise StopIteration
-        else:
-            self._idx += 1
-            return self._dset[self._idc[self._idx - 1]]
-
-    def prev(self):
-        """Return the next element in the iterating list"""
-        if self._idx < 0:
-            raise StopIteration
-        else:
-            self._idx -= 1
-            return self._dset[self._idc[self._idx + 1]]
-
     def __iter__(self):
         """Make it iterative"""
-        return self
+        for idx in self._idc:
+            yield self._dset.item(idx)
 
 class DataItem(dict):
     """Keeps data"""
     def __init__(self, *arg, **karg):
         super(DataItem, self).__init__(*arg, **karg)
 
-
     def accum_dist(self, src):
         """merge two distribution of words"""
         for key in src.iterkeys():
-            if key in self:
+            if key in self.iterkeys():
                 self[key] += src[key]
             else:
                 self[key] = src[key]
-
-    #def __str__(self):
-        #"""generate json string for this object
-        #"""
-        #resstr = str()
-        #for key in self:
-            #resstr += key + ':' + self[key] + '\n'
-        #return resstr
 
 #---------------------------------------------------------- Database Access
 def loadrows(config, cols, wheres=None, table='sample', other=''):
@@ -182,7 +163,7 @@ def loadrows(config, cols, wheres=None, table='sample', other=''):
     cur.execute(query)
     res = Dataset()
     for row in cur:
-        twt = dict()
+        twt = DataItem()
         for key in cols:
             twt[key] = row[key]
         res.append(twt)
@@ -194,7 +175,7 @@ def qloadrows(config, query):
     cur = CONN_POOL.get_cur(config)
     print query
     cur.execute(query)
-    return Dataset([row for row in cur])
+    return Dataset().extend([row for row in cur])
 
 def place_name(pid, dbconf):
     """Return place name given a pid"""

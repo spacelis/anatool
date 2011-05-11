@@ -59,7 +59,7 @@ def idf(dset):
         @return DataItem() of term -> IDF values
     """
     idfdist = DataItem()
-    for key in dset:
+    for key in dset.iterkeys():
         idfdist[key] = count_non_zero(dset[key])
     return idfdist
 
@@ -69,7 +69,7 @@ def bgdist(dset):
         @return DataItem() of term -> tf values in the whole corpus
     """
     dist = DataItem()
-    for key in dset:
+    for key in dset.iterkeys():
         dist[key] = sum(dset[key])
     return dist
 
@@ -92,7 +92,7 @@ def f_tfidf(text):
     """
     dset = f_tf(text)
     idfdist = idf(dset)
-    for key in dset:
+    for key in dset.iterkeys():
         for idx in range(len(text)):
             dset[key][idx] /= idfdist[key]
     return dset
@@ -105,7 +105,7 @@ def f_tfidf_logidf(text):
     """
     dset = f_tf(text)
     idfdist = idf(dset)
-    for key in dset:
+    for key in dset.iterkeys():
         for idx in range(len(text)):
             dset[key][idx] *= math.log(len(text)/idfdist[key])
     return dset
@@ -116,7 +116,7 @@ def norm_e(dset):
         @return Dataset() of vectors normalized
     """
     ndset = Dataset()
-    for key in dset:
+    for key in dset.iterkeys():
         maxval = max(dset[key])
         ndset[key] = list()
         for val in dset[key]:
@@ -132,7 +132,7 @@ def norm_v2(dset):
     for idx in range(dset.size()):
         sqrval = math.sqrt(sum(dset[key][idx]**2 for key in dset))
         item = DataItem()
-        for key in dset:
+        for key in dset.iterkeys():
             item[key] = dset[key][idx] / sqrval
         ndset.append(item)
     return ndset

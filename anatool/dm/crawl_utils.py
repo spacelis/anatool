@@ -1,6 +1,7 @@
 """Version 0.1.4
 This module is used for data management
 History:
+    0.1.5 minor change
     0.1.4 add place id generating function to retrieve
         place informatin and a function to import those
         places
@@ -10,6 +11,8 @@ History:
     0.1.1 add import methods
 
 """
+__version__ = '0.1.5'
+__author__ = 'SpaceLis'
 
 import json, re, logging, fileinput, gzip, time, os, sys
 import _mysql_exceptions
@@ -17,7 +20,8 @@ import traceback
 from anatool.dm.log_helper import LogFunction
 from anatool.dm.db import GEOTWEET, CONN_POOL
 from anatool.analyze.dataset import loadrows
-from anatool.analyze.text_util import get_tokens, html_filter
+from anatool.analyze.text_util import html_filter
+from anatool.analyze.feature import get_tokens
 
 def named(name, ext):
     """rename the file if there is a file in the same name
@@ -28,6 +32,7 @@ def named(name, ext):
         i += 1
     return name + '{0}.'.format(i) + ext
 
+#TODO change the file format to CSV and use the csv module
 
 @LogFunction('Filtering POI')
 def filter_poi(dst, srcs):
@@ -93,17 +98,20 @@ def im_tweet(srcs):
 
             k += 1
             if len(get_tokens(tjson['text']))>0:
-                cur.execute('INSERT INTO sample ( \
-                        id, \
-                        place_id, \
-                        user_id, \
-                        text, \
-                        lat, \
-                        lng, \
-                        geo,\
-                        created_at) \
-                        VALUES(%s,%s,%s,%s,%s,%s,GeomFromText(\'POINT({0} {1})\'),%s)'.format(lat, lng), item)
-            cur.execute('INSERT INTO tweet_json(id, json) VALUES(%s,%s)', (tjson['id'], line))
+                cur.execute('INSERT INTO sample ('
+                        'id, '
+                        'place_id, '
+                        'user_id, '
+                        'text, '
+                        'lat, '
+                        'lng, '
+                        'geo, '
+                        'created_at) '
+                        'VALUES(%s,%s,%s,%s,%s,%s,'
+                        'GeomFromText(\'POINT({0} {1})\'),%s)'. \
+                        format(lat, lng), item)
+            cur.execute('INSERT INTO tweet_json(id, json) VALUES(%s,%s)',
+                    (tjson['id'], line))
             i += 1
         except _mysql_exceptions.IntegrityError:
             print 'Import Tweets::Tweet ID {0} ignored for duplication.'\
@@ -122,14 +130,14 @@ def im_place(srcs):
     cur = CONN_POOL.get_cur(GEOTWEET)
 
     k, i = 0, 0
-    fi = fileinput.FileInput(openhook = fileinput.hook_compressed)
-    for line in fi.input(srcs):
+    fin = fileinput.FileInput(openhook = fileinput.hook_compressed)
+    for line in fin.input(srcs):
         try:
             tjson = json.loads(line)
             k += 1
             lat = 0
             lng = 0
-            if tjson['place_type']!='country':
+            if tjson['place_type'] != 'country':
                 lat = tjson['bounding_box'] \
                                 ['coordinates'][0][0][1]
                 lng = tjson['bounding_box'] \
@@ -154,19 +162,22 @@ def im_place(srcs):
                         None,
                         tjson['country_code'])
 
-            cur.execute('INSERT INTO place ( \
-            `id`, \
-            `name`, \
-            `type`, \
-            `superior_id`, \
-            `superior_name`, \
-            `superior_type`, \
-            `lat`, \
-            `lng`, \
-            `country`, \
-            `geo`) \
-            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,GeomFromText(\'Point({0} {1})\'))'.format(lat, lng), item)
-            cur.execute('INSERT INTO place_json (id, json) VALUES(%s,%s)', (tjson['id'], line))
+            cur.execute('INSERT INTO place ('
+            '`id`, '
+            '`name`, '
+            '`type`, '
+            '`superior_id`, '
+            '`superior_name`, '
+            '`superior_type`, '
+            '`lat`, '
+            '`lng`, '
+            '`country`, '
+            '`geo`)'
+            'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,'
+            'GeomFromText(\'Point({0} {1})\'))'.\
+                    format(lat, lng), item)
+            cur.execute('INSERT INTO place_json (id, json) VALUES(%s,%s)', \
+                    (tjson['id'], line))
             i += 1
         except _mysql_exceptions.IntegrityError:
             print 'Import Places::Place ID {0} ignored for duplication.'.format(
@@ -189,7 +200,9 @@ def im_place_genre(srcs):
         try:
             rst = json.loads(line)
             pid = rst['t_place_id']
-            cur.execute(r'''insert into foursquare_json(id, json) values(%s,%s)''', (str(pid), json.dumps(rst['response']['groups'])))
+            cur.execute(r'insert into foursquare_json(id, json) '
+                    'values(%s,%s)', \
+                    (str(pid), json.dumps(rst['response']['groups'])))
         except _mysql_exceptions.IntegrityError:
             print 'Import place genre::Place {0} ignored for duplication.'\
                     .format(rst['t_place_id'])
@@ -207,7 +220,9 @@ def gen_geocode_list(dst):
     #cur.execute('SELECT id, lat, lng, max_tweet_id\
             #FROM place_dist where cnt>100')
     i = 0
-    for row in loadrows(GEOTWEET, ('id', 'lat', 'lng', 'max_tweet_id'), None, 'place_dist'):
+    for row in loadrows(GEOTWEET, \
+            ('id', 'lat', 'lng', 'max_tweet_id'), \
+            None, 'place_dist'):
         print >> fdst, '{0},{1},{2}${3}'.format( \
             row['lat'], row['lng'], '0.1km', row['max_tweet_id'])
         i += 1
@@ -226,7 +241,8 @@ def gen_usr_list(dst):
     #cur.execute('SELECT id, max_tweet_id\
             #FROM user_dist')
     i = 0
-    for row in loadrows(GEOTWEET, ('id', 'max_tweet_id'), ('cnt>10',), 'user_dist'):
+    for row in loadrows(GEOTWEET, \
+            ('id', 'max_tweet_id'), ('cnt>10',), 'user_dist'):
         print >> fdst, '{0}${1}'.format(row['id'], row['max_tweet_id'])
         i += 1
 
@@ -283,11 +299,13 @@ def gen_place_info_list(dst):
 
 
     #cur = CONN_POOL.get_cur(GEOTWEET)
-    #cur.execute('SELECT id, name, lat, lng FROM place_dist WHERE category is NULL')
+    #cur.execute('SELECT id, name, lat, lng FROM '
+    # 'place_dist WHERE category is NULL')
     i = 0
     for row in loadrows(GEOTWEET, ('id', 'name', 'lat', 'lng'), \
             None, 'place'):
-        if row['name'] == None: continue
+        if row['name'] == None:
+            continue
         print >> fdst, row['id'] + '$' \
                 + row['name'] + '$' \
                 + str(row['lat']) + ',' + str(row['lng'])
@@ -327,21 +345,25 @@ def merge_tweet(dst, srcs):
             jtwt = json.loads(line)
             if jtwt['id'] not in idset:
                 idset.add(jtwt['id'])
-                print >>fdst, line.strip()
+                print >> fdst, line.strip()
                 print k, '\r',
                 k += 1
-        except Exception as e:
+        except:
             pass
     print
     logging.info('{0} out of {1} merged'.format(k, i))
 
 @LogFunction('Filter out pic URL')
-def filter_picURL(dst, srcs):
+def filter_picurl(dst, srcs):
     """Filter out all pic related URLs in tweets
     """
-    from tcrawl.crawler import SERVICEPROVIDERS
+    # a list of usable picture service support by this crawling module
+    _serviceproviders = ['twitpic.com', \
+                    'yfrog.com', \
+                    'tweetphoto.com', \
+                    'plixi.com']
     url_pattern = [re.compile('http://' + site + '/[a-zA-Z0-9_/-]+') \
-            for site in SERVICEPROVIDERS.iterkeys()]
+            for site in _serviceproviders]
     hash_tag = re.compile('#[a-zA-z_]\\w*')
 
     fdst = open(dst, 'w')
@@ -351,8 +373,9 @@ def filter_picURL(dst, srcs):
             i += 1
             jtwt = json.loads(line)
             if jtwt['text'].find('yfrog') > 0:
-                ht = hash_tag.findall(jtwt['text'])
-                if len(ht) == 0: continue
+                htpos = hash_tag.findall(jtwt['text'])
+                if len(htpos) == 0:
+                    continue
                 for ptn in url_pattern:
                     mth = ptn.findall(jtwt['text'])
                     for url in mth:
@@ -360,9 +383,9 @@ def filter_picURL(dst, srcs):
                         print >> fdst, url + '$' \
                                 + urlpart[2] + '_' + urlpart[-1] + '$'\
                                 + str(jtwt['id']) + '$' \
-                                + ','.join(ht)
+                                + ','.join(htpos)
                         k += 1
-        except Exception:
+        except:
             pass
     logging.info('{0} URLs out of {1} tweets'.format(k, i))
 
@@ -429,8 +452,10 @@ if __name__ == '__main__':
 
     # running scripts
     #process(('../data/tweet-26_04_2011-17_29_29.ljson.gz',))
-    #gen_urls('../data/list/web_rd1.lst', ('../data/websearch_b-28_04_2011-15_47_28.ljson',))
-    #im_webpage(('../../data/web_f.ljson','../../data/web-06_05_2011-10_29_43.ljson.gz'))
+    #gen_urls('../data/list/web_rd1.lst', \
+            #('../data/websearch_b-28_04_2011-15_47_28.ljson',))
+    #im_webpage(('../../data/web_f.ljson',
+            #'../../data/web-06_05_2011-10_29_43.ljson.gz'))
 
 
 
@@ -448,8 +473,8 @@ if __name__ == '__main__':
             #'../data/place_info-10_01_2011-10_52_05.ljson'))
     #gen_sample('../data/somesample.json', '../db/geostream2.db', 10000)
     #gen_poi_list('../data/list/poi_list_r13.lst')
-    #gen_geocode_list('../data/list/geocode_list_r16.lst')
-    #gen_usr_list('../data/list/usr_r16.lst')
+    #gen_geocode_list('../../data/list/tweet_g_r17.lst')
+    #gen_usr_list('../../data/list/tweet_u_r17.lst')
     #gen_twid_list('../data/list/en_list_r15.lst', ( \
             #'../data/poi_rd15.ljson',
             #'../data/tweet_g-03_03_2011-14_21_00.ljson',
@@ -460,9 +485,10 @@ if __name__ == '__main__':
     #gen_place_info_list('../data/list/p_info_r13.lst')
     #filter_tweet()
     #merge_tweet('../data/tweets1.ljson.gz', \
-            #('../data/tweets.ljson.gz', '../data/tweet_u-28_03_2011-15_39_49.ljson.gz',))
+            #('../data/tweets.ljson.gz',
+            #'../data/tweet_u-28_03_2011-15_39_49.ljson.gz',))
             #'../data/tweet_u-18_02_2011-13_36_39.ljson'))
-    #filter_picURL('../data/list/pic_r4.lst',
+    #filter_picurl('../data/list/pic_r4.lst',
             #(
                         #'../data/_tweets0.ljson',\
                         #'../data/_tweets1.ljson'
