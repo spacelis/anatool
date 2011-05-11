@@ -12,7 +12,7 @@ __author__ = 'SpaceLis'
 
 import csv
 from anatool.dm.db import CONN_POOL, GEOTWEET
-from anatool.analyze.dataset import place_name
+from anatool.analyze.dataset import Dataset, place_name
 from anatool.analyze.lm import lmfromtext, kl_divergence
 from operator import itemgetter
 
@@ -65,22 +65,21 @@ def web_based_guess():
 
     # calculate the KLD for each pair of tweets and web pages
     # and rank the lmweb
-    score = dict()
+    score = Dataset()
     for pid_twt in lmtwt.iterkeys():
         rank = list()
         for pid_web in lmweb.iterkeys():
-            rank.append((pid_web, kl_divergence(lmweb[pid_web], lmtwt[pid_twt])))
-        score[pid_twt] = sorted(rank, key=itemgetter(1), reverse=False)
+            rank.append((place_name(pid_web), kl_divergence(lmweb[pid_web], lmtwt[pid_twt])))
+        score[place_name(pid_twt)] = sorted(rank, key=itemgetter(1), reverse=False)
 
 
-    # give the outcome
-    fout = open('rank.lst', 'w')
-    for pid_twt in lmtwt.iterkeys():
-        print >> fout, place_name(pid_twt, GEOTWEET)
-        for item in score[pid_twt]:
-            print >> fout, '({0}, {1}),'.format(place_name(item[0], GEOTWEET), item[1]),
-        print >> fout
+    # output the outcome
+    score.write2csv('rank.lst')
 
+def evaluation():
+    """docstring for evaluation
+    """
+    pass
 
 def expr():
     web_based_guess()

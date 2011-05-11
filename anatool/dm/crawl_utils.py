@@ -15,9 +15,9 @@ __version__ = '0.1.5'
 __author__ = 'SpaceLis'
 
 import json, re, logging, fileinput, gzip, time, os, sys
-import _mysql_exceptions
 import traceback
-from anatool.dm.log_helper import LogFunction
+import _mysql_exceptions
+from annotation import LogFunction
 from anatool.dm.db import GEOTWEET, CONN_POOL
 from anatool.analyze.dataset import loadrows
 from anatool.analyze.text_util import html_filter
