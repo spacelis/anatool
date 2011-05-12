@@ -122,19 +122,48 @@ class Dataset(dict):
             rst[key] = self[key][idx]
         return rst
 
-    def write2csv(self, filename, transposed = False):
+    def writecsv(self, filename, **kargs):
         """ write this dataset into a csv file
+            @arg filename the path to the csv file
+            @kargs headers whether the output include headers
+            @kargs transposed whether output in the transposed manner
+            @kargs delimiter the delimiter used in csv file
+            @kargs quotechar the quotechar used in csv file
         """
+        _kargs = {
+                'headers': True,
+                'transposed' : False,
+                'delimiter' : ';',
+                'qotechar' : '`'}.update(kargs)
+
         keys = [key for key in self.iterkeys()]
         with open(filename, 'wb') as fout:
-            csvwriter = csv.writer(fout, delimiter=';', quotechar='`')
-            if not transposed:
-                csvwriter.writerow([key for key in keys])
+            csvwriter = csv.writer(fout, delimiter=_kargs['delimiter'],
+                    quotechar=_kargs['qotechar'])
+            if not _kargs['transposed']:
+                if _kargs['headers']:
+                    csvwriter.writerow([key for key in keys])
                 for item in self:
                     csvwriter.writerow([item[key] for key in keys])
             else:
                 for key in keys:
-                    csvwriter.writerow([key, ] + self[key])
+                    csvwriter.writerow([key, ] if _kargs['header'] else list() \
+                            + self[key])
+    @classmethod
+    def readcsv(filename, **kargs):
+        """read from a csv file
+            @arg filename the path to the csv file
+            @kargs headers whether the output include headers
+            @kargs transposed whether output in the transposed manner
+            @kargs delimiter the delimiter used in csv file
+            @kargs quotechar the quotechar used in csv file
+        """
+        _kargs = {
+                'headers': True,
+                'transposed' : False,
+                'delimiter' : ';',
+                'qotechar' : '`'}.update(kargs)
+        #TODO finish read from a csv file
 
 
     def __iter__(self):

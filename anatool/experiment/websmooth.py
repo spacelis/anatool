@@ -5,12 +5,14 @@ Description:
     Verifying whether the web pages from search engine can support tweets
     smoothing in place wise.
 History:
+    0.2.0 add ranking place by web pages
     0.1.0 The first version.
 """
 __version__ = '0.1.0'
 __author__ = 'SpaceLis'
 
 import csv
+import matplotlib.pyplot as plt
 from anatool.dm.db import CONN_POOL, GEOTWEET
 from anatool.analyze.dataset import Dataset, place_name
 from anatool.analyze.lm import lmfromtext, kl_divergence
@@ -69,23 +71,32 @@ def web_based_guess():
     for pid_twt in lmtwt.iterkeys():
         rank = list()
         for pid_web in lmweb.iterkeys():
-            rank.append((place_name(pid_web), kl_divergence(lmweb[pid_web], lmtwt[pid_twt])))
-        score[place_name(pid_twt)] = sorted(rank, key=itemgetter(1), reverse=False)
+            rank.append((place_name(pid_web),
+                kl_divergence(lmweb[pid_web], lmtwt[pid_twt])))
+        score[place_name(pid_twt)] = [pname for pname, kld in \
+                sorted(rank, key=itemgetter(1), reverse=False)]
 
-    score.write2csv('rank.lst', False)
+    #score.write2csv('rank.lst', False)
+    return score
 
-    #fout = open('rank2.lst', 'w')
-    #for pid_twt in lmtwt.iterkeys():
-        #print >> fout, place_name(pid_twt, GEOTWEET)
-        #for item in score[pid_twt]:
-            #print >> fout, '({0}, {1}),'.format(place_name(item[0], GEOTWEET), item[1]),
-        #print >> fout
+
+def evaluate(ranks):
+    prec = list()
+    for pos in range(0, ranks.size()):
+        goal = 0
+        for query in ranks.iterkeys():
+            if query in set(ranks[query][:pos]):
+                goal += 1
+        prec.append(goal / float(len(ranks)))
+    plt.plot(range(0, ranks.size()), prec)
+    plt.xlabel('List Length')
+    plt.ylabel('Goal Rate')
+    plt.title('Goal Graph')
+    plt.show()
 
 def expr():
-    web_based_guess()
+    evaluate(web_based_guess())
 
 if __name__ == '__main__':
     expr()
-
-
 
