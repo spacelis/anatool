@@ -2,6 +2,7 @@
 Description:
 This module contains all the data model used in analysis
 History:
+    0.2.4: ! fix bugs in writecsv
     0.2.3: + csv output for Dataset
     0.2.2: + Dataset, DataItem classes
     0.2.1: add lots of things
@@ -9,7 +10,7 @@ History:
     0.1.0: The first version
 """
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 __author__ = 'SpaceLis'
 
 import random, csv
@@ -134,12 +135,13 @@ class Dataset(dict):
                 'headers': True,
                 'transposed' : False,
                 'delimiter' : ';',
-                'qotechar' : '`'}.update(kargs)
+                'quotechar' : '`'}
+        _kargs.update(kargs)
 
         keys = [key for key in self.iterkeys()]
         with open(filename, 'wb') as fout:
             csvwriter = csv.writer(fout, delimiter=_kargs['delimiter'],
-                    quotechar=_kargs['qotechar'])
+                    quotechar=_kargs['quotechar'])
             if not _kargs['transposed']:
                 if _kargs['headers']:
                     csvwriter.writerow([key for key in keys])
@@ -147,7 +149,7 @@ class Dataset(dict):
                     csvwriter.writerow([item[key] for key in keys])
             else:
                 for key in keys:
-                    csvwriter.writerow([key, ] if _kargs['header'] else list() \
+                    csvwriter.writerow([key, ] if _kargs['headers'] else list() \
                             + self[key])
     @classmethod
     def readcsv(filename, **kargs):
@@ -162,7 +164,8 @@ class Dataset(dict):
                 'headers': True,
                 'transposed' : False,
                 'delimiter' : ';',
-                'qotechar' : '`'}.update(kargs)
+                'quotechar' : '`'}
+        _kargs.update(kargs)
         #TODO finish read from a csv file
 
 
