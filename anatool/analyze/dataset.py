@@ -63,10 +63,11 @@ class Dataset(dict):
         """Add a new data item into the dataset
         This is just for mocking list().append()
         """
+        _size = self.size()
         for key in item.iterkeys():
             if key not in self:
                 # TODO add default values for unseen key
-                self[key] = [0 for idx in range(self.size())]
+                self[key] = [0 for idx in range(_size)]
             self[key].append(item[key])
 
     def extend(self, itemlist):
@@ -207,7 +208,7 @@ def loadrows(config, cols, wheres=None, table='sample', other=''):
             ((', '.join(cols)) if cols!='*' else '*') \
             + ' FROM ' + table + \
             ((' WHERE ' + ' AND '.join(wheres)) if wheres else '') \
-            + other
+            + ' ' + other
     cur = CONN_POOL.get_cur(config)
     print query
     cur.execute(query)
