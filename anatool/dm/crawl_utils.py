@@ -409,7 +409,7 @@ def gen_urls(dst, srcs):
     for line in fileinput.input(srcs, openhook = fileinput.hook_compressed):
         jlist = json.loads(line)
         for entry in jlist['gresults']:
-            print >> fdst, u'$'.join((jlist['q'], entry['Url'])).encode('utf-8')
+            print >> fdst, '$'.join((jlist['q'], entry['Url'])).encode('utf-8')
             k += 1
     print '{0} URLs generated'.format(k)
     fdst.close()
@@ -452,8 +452,8 @@ if __name__ == '__main__':
 
     # running scripts
     #process(('../data/tweet-26_04_2011-17_29_29.ljson.gz',))
-    #gen_urls('../data/list/web_rd1.lst', \
-            #('../data/websearch_b-28_04_2011-15_47_28.ljson',))
+    #gen_urls('../../data/list/web_rd2.lst', \
+            #('../../data/websearch_b-16_05_2011-13_08_04.ljson.gz',))
     #im_webpage(('../../data/web_f.ljson',
             #'../../data/web-06_05_2011-10_29_43.ljson.gz'))
 

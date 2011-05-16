@@ -85,14 +85,18 @@ class Dataset(dict):
             vset.add(val)
         return [val for val in vset]
 
+    def sorted_items(self, key):
+        """ Access the sequence of items in sorted manner based on key
+        """
+        indices = sorted(range(self.size()), key=lambda x:self[key][x])
+        for idx in indices:
+            yield self.item(idx)
+
     def groupfunc(self, key, pkey, func):
         """Return the output of a function to the values grouped by key
         """
         rst = DataItem()
-        if self.sortedkey == key:
-            indices = range(self.size())
-        else:
-            indices = sorted(indices, key=lambda x:self[key][x])
+        indices = sorted(range(self.size), key=lambda x:self[key][x])
         temp = list()
         idx_val = type(self[key][0]).__init__()
         for idx in indices:
