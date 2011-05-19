@@ -17,10 +17,13 @@ __author__ = 'SpaceLis'
 import json, re, logging, fileinput, gzip, time, os, sys
 import traceback
 import _mysql_exceptions
+import MySQLdb
+import warnings
+
 from annotation import LogFunction
 from anatool.dm.db import GEOTWEET, CONN_POOL
 from anatool.analyze.dataset import loadrows
-from anatool.analyze.text_util import html_filter
+from anatool.analyze.text_util import html_filter, isreadable
 from anatool.analyze.feature import get_tokens
 
 def named(name, ext):
@@ -420,14 +423,19 @@ def im_webpage(srcs):
     """ Import web pages from file to database.
     """
     # Connect to MySQL database
+    warnings.simplefilter("error", MySQLdb.Warning)
     cur = CONN_POOL.get_cur(GEOTWEET)
     i, k = 0, 0
     for line in fileinput.input(srcs, openhook = fileinput.hook_compressed):
         try:
             k += 1
             tjson = json.loads(line)
-            item = (tjson['q'], \
-                    html_filter(tjson['web']))
+            text = tjson['web']
+            if not isreadable(text):
+                print text[:80].encode('cp1252', errors='ignore')
+                continue
+            item = (tjson['place_id'], \
+                    html_filter(text).encode('utf-8', errors='ignore'))
             cur.execute('INSERT INTO web ( \
                     place_id, \
                     web) \
@@ -454,7 +462,7 @@ if __name__ == '__main__':
     #process(('../data/tweet-26_04_2011-17_29_29.ljson.gz',))
     #gen_urls('../../data/list/web_rd2.lst', \
             #('../../data/websearch_b-16_05_2011-13_08_04.ljson.gz',))
-    #im_webpage(('../../data/web_f.ljson',
+    im_webpage(('../../data/web-17_05_2011-16_23_37.ljson.gz',))
             #'../../data/web-06_05_2011-10_29_43.ljson.gz'))
 
 

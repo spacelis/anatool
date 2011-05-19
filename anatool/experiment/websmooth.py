@@ -35,27 +35,43 @@ def reunit(vector):
 #--------------------------------------------------------------- Experiment
 
 @Cache()
-def webmodel(place_id):
+def webmodel(place_id, cnt):
     """ Build language models from web pages searched by query the place name
         @arg place_id the place ID in Twitter system
         @return LM made from the web pages
     """
     cur = CONN_POOL.get_cur(GEOTWEET)
-    cur.execute('select web from web where place_id = \'{0}\''.format(place_id))
+    cur.execute('select web from web where '\
+            'place_id = \'{0}\' limit {1}'.format(place_id, cnt))
     text_web = [row['web'] for row in cur]
     return lmfromtext(text_web)
 
 @Cache()
-def twtmodel(place_id):
+def twtmodel(place_id, cnt):
     """ Build language models from tweets located at place_id
         @arg place_id the place ID in Twitter system
         @return LM made from the web pages
     """
     cur = CONN_POOL.get_cur(GEOTWEET)
     cur.execute('select text from sample' \
-            ' where place_id = \'{0}\' limit {1}'.format(place_id, randint(5,20)))
+            ' where place_id = \'{0}\' limit {1}'.format(place_id, cnt))
     text_web = [row['text'] for row in cur]
     return lmfromtext(text_web)
+
+def kl_ranking(lmcand, lmtext):
+    """ Rank the LM in lmcand according to the KL-divergences to LM from text
+        @arg text list() of str()
+        @arg lmcand dict() of place_id to lm
+        @return an ordered Dataset() of {'pid', 'kld'}
+    """
+    rank = list()
+    for pid in lmcand.iterkeys():
+        rank.append((pid, kl_divergence(lmcand[pid], lmtext)))
+    rank = sorted(rank, key=itemgetter(1), reverse=False)
+    res = Dataset()
+    for item in rank:
+        res.append({'pid': item[0], 'kld': item[1]})
+    return res
 
 def guess(text, candidates, method):
     """ Guess where the text from. Rank the place by comparing the difference
@@ -64,32 +80,24 @@ def guess(text, candidates, method):
         @arg candidates the candidates of places, list() of place IDs
         @return an ordered Dataset() of {'pid', 'kld'}
     """
-    lmweb = dict()
+    lmcand = dict()
     for place_id in candidates:
         place_id = place_id.strip()
-        lmweb[place_id] = method(place_id)
-    lmtest = lmfromtext(text)
-    rank = list()
-    for pid_web in lmweb.iterkeys():
-        rank.append((pid_web, kl_divergence(lmweb[pid_web], lmtest)))
-    rank = sorted(rank, key=itemgetter(1), reverse=False)
-    res = Dataset()
-    for item in rank:
-        res.append({'pid': item[0], 'kld': item[1]})
-    return res
+        lmcand[place_id] = method(place_id, 1000)
+    return kl_ranking(lmfromtext(text), lmcand)
 
-def joinedguess(text, candidates, lmd):
+def joint_ranking(lmtest, lmtwt, lmweb, balance):
     """ Join the two language model to generate more accurate results
     """
-    twtges = guess(text, candidates, twtmodel)
-    webges = guess(text, candidates, webmodel)
+    twtges = kl_ranking(lmtwt, lmtest)
+    webges = kl_ranking(lmweb, lmtest)
     twtges['kld'] = reunit(twtges['kld'])
     webges['kld'] = reunit(webges['kld'])
     rank = list()
     for titem, witem in zip(twtges.sorted_items('pid'), webges.sorted_items('pid')):
         if titem['pid'] == witem['pid']:
             rank.append((titem['pid'],
-                lmd * titem['kld'] + (1 - lmd) * witem['kld']))
+                balance * titem['kld'] + (1 - balance) * witem['kld']))
     rank = sorted(rank, key=itemgetter(1), reverse=False)
     res = Dataset()
     for item in rank:
@@ -110,60 +118,142 @@ def evaluate(ranks, expects, pos):
             goal += 1
     return float(goal) / len(ranks)
 
-def batcheval(expects, maxpos, rankslst, labels):
+def batcheval(expects, maxpos, ranks):
     """ The batch version of evaluate() which test a set of pos
         @arg ranks list() of ranks returned by webguess()
         @arg expects list() of expected place_ids
         @arg maxpos the max position
         @return a list of rates of goals
     """
-    for ranks, lbl in zip(rankslst, labels):
-        goalrates = Dataset()
-        for pos in range(maxpos + 1):
-            goalrates.append({'pos': pos, 'rate': evaluate(ranks, expects, pos)})
-        print goalrates['rate']
-        plt.plot(range(maxpos + 1), goalrates['rate'], label=lbl)
-    plt.xlabel('List Length')
-    plt.ylabel('Goal Rate')
-    plt.title('Goal Graph')
-    plt.legend(loc='lower right')
-    plt.show()
+    goalrates = Dataset()
+    for pos in range(maxpos + 1):
+        goalrates.append({'pos': pos, 'rate': evaluate(ranks, expects, pos)})
+    return goalrates
+
 
 #--------------------------------------------------------------- setups
 
-def setup(places, num):
+def linestyles(styles=['-', '--', '-.', ':']):
+    """ Yield different styles in iteration
+    """
+    while True:
+        for style in styles:
+            yield style
+
+def kldiff(places):
+    """ compare the difference of kl-divergence between tweets and web pages
+        for each place in places
+    """
+    diff = Dataset()
+    for pid in places:
+        twt = loadrows(GEOTWEET, ('place_id', 'text'),
+                ('place_id=\'{0}\''.format(pid),), 'sample',
+                'order by rand() limit {0}'.format(100))
+        web = loadrows(GEOTWEET, ('place_id', 'web'),
+                ('place_id=\'{0}\''.format(pid),), 'web',
+                'limit 25')
+        lmref = lmfromtext(twt['text'][:50])
+        lmtwt = lmfromtext(twt['text'][51:])
+        lmweb = lmfromtext(web['web'])
+        diff.append({'pid': pid, 'twtkld': kl_divergence(lmtwt, lmref),
+            'webkld': kl_divergence(lmweb, lmref)})
+    for item in diff:
+        print '{0} & {1} & {2}'.format(place_name(item['pid']), item['twtkld'], item['webkld'])
+
+def onesetup(places, numtwts, numtest, balance):
     """ This setup considers the tweets from the places in the list and select
-        some number of tweets from those places as testing tweets
+        some number of tweets from those places as testing tweets, the query is just one tweet
         @arg city the place_id of the city
         @arg num the number of tweets generated
         @return a list() of tuple (text, cadidates)
     """
-    twt = Dataset()
+    lsts = linestyles()
+    # prepare for data
+    twtmodel = dict()
+    webmodel = dict()
+    twttest = Dataset()
     for pid in places:
-        twt.extend(loadrows(GEOTWEET, ('place_id', 'text', 'created_at'),
+        twtp = loadrows(GEOTWEET, ('place_id', 'text'),
                 ('place_id=\'{0}\''.format(pid),), 'sample',
-                'order by rand() limit {0}'.format(num/len(places) + 1)))
-    joinedranks = list()
-    for item in twt:
-        joinedranks.append(joinedguess([item['text'],], places, 0.6))
+                'order by rand() limit {0}'.format(max(numtwts) + numtest))
+        webmodel[pid] = loadrows(GEOTWEET, ('place_id', 'web'),
+                ('place_id=\'{0}\''.format(pid),), 'web',
+                'order by rand() limit 30')['web']
+        twtmodel[pid] = twtp['text'][:max(numtwts)]
+        for idx in range(max(numtwts) + 1, twtp.size()):
+            twttest.append(twtp.item(idx))
+
+    # ranking by twt and twt+web
+    for numtwt in numtwts:
+        lmtwt = dict()
+        lmweb = dict()
+        for pid in twtmodel.iterkeys():
+            lmtwt[pid] = lmfromtext(twtmodel[pid][:numtwt])
+            lmweb[pid] = lmfromtext(webmodel[pid])
+        jointranks = list()
+        for item in twttest:
+            jointranks.append(joint_ranking(lmfromtext([item['text'],]), lmtwt, lmweb, balance))
+        twtranks = list()
+        for item in twttest:
+            twtranks.append(kl_ranking(lmtwt, lmfromtext([item['text'],])))
+        gjoint = batcheval(twttest['place_id'], len(places), jointranks)
+        gtwt = batcheval(twttest['place_id'], len(places), twtranks)
+        plt.plot(gjoint['pos'], gjoint['rate'], marker='^',
+                label='JOINT($t={0}$)'.format(numtwt), linestyle=lsts.next())
+        plt.plot(gtwt['pos'], gtwt['rate'], marker='o',
+                label='TWEET($t={0}$)'.format(numtwt), linestyle=lsts.next())
+
     webranks = list()
-    for item in twt:
-        webranks.append(guess([item['text'],], places, webmodel))
-    twtranks = list()
-    for item in twt:
-        twtranks.append(guess([item['text'],], places, twtmodel))
-    batcheval(twt['place_id'], len(places),
-            [joinedranks, webranks, twtranks],
-            ['joined', 'web', 'tweet']
-            )
+    for item in twttest:
+        webranks.append(kl_ranking(lmweb, lmfromtext([item['text'],])))
+    gweb = batcheval(twttest['place_id'], len(places), webranks)
+    plt.plot(gweb['pos'], gweb['rate'], label='WEB', linestyle='dotted')
+    plt.xlabel('First $n$ Places')
+    plt.ylabel('Probability')
+    plt.legend(loc='lower right')
+    plt.show()
+
+def sparsitysetup(nums):
+    """ This setup considers the tweets from the places in the list and select
+        some number of tweets from those places as testing tweets, the query is a block of tweets
+        @arg city the place_id of the city
+        @arg num the number of tweets generated
+        @return a list() of tuple (text, cadidates)
+    """
+    lsts = linestyles()
+    for num in nums:
+        with open('chicago10.lst') as fin:
+            twt = Dataset()
+            places = [p.strip() for p in fin]
+            lmplc = dict()
+            lmtwt = Dataset()
+            for pid in places:
+                cur = CONN_POOL.get_cur(GEOTWEET)
+                cur.execute('select text from sample' \
+                        ' where place_id = \'{0}\' order by rand() limit {1}'.format(pid, 160))
+                text = [row['text'] for row in cur]
+                lmplc[pid] = lmfromtext(text[:num])
+                for txt in text[150:160]:
+                    lmtwt.append({'pid': pid, 'lm': lmfromtext([txt,])})
+            ranks = list()
+            for item in lmtwt:
+                ranks.append(kl_ranking(lmplc, item['lm']))
+            gch = batcheval(lmtwt['pid'], len(places), ranks)
+            plt.plot(gch['pos'], gch['rate'],
+                    lsts.next(), label='t={0}'.format(num))
+    plt.xlabel('First $n$ places')
+    plt.ylabel('Probability')
+    plt.legend(loc='lower right')
+    plt.show()
 
 def test():
     """ execute the setups
     """
-    with open('newyork10.lst') as fin:
-        setup([p.strip() for p in fin], 100) #New York City
-    #evaluate2(web_based_guess2())
-    pass
+    with open('chicago10_web.lst') as fin:
+        onesetup([p.strip() for p in fin], [100, 5], 10, 0.5) #New York City
+    #sparsitysetup([100, 25, 10, 5])
+    #with open('chicago10.lst') as fin:
+        #kldiff([p.strip() for p in fin]) #New York City
 
 
 if __name__ == '__main__':
