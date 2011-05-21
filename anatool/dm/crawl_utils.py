@@ -396,12 +396,13 @@ def filter_picurl(dst, srcs):
 def process(srcs):
     """batch processing incoming data
     """
-    poi_name = named('../data/poi_tmp', 'json')
-    filter_poi(poi_name, srcs)
+    poi_name = named('../../data/poi_tmp', 'json')
+    #filter_poi(poi_name, srcs)
+    poi_name = '../../data/poi_tmp15.json'
     im_tweet((poi_name,))
-    mlist = ['../data/tweets.ljson.gz',]
+    mlist = ['../../data/tweets.ljson.gz',]
     mlist.extend(srcs)
-    merge_tweet('../data/tweets1.ljson.gz', mlist)
+    merge_tweet('../../data/tweets1.ljson.gz', mlist)
 
 @LogFunction('Parse Bing search results')
 def gen_urls(dst, srcs):
@@ -459,10 +460,10 @@ if __name__ == '__main__':
 
 
     # running scripts
-    #process(('../data/tweet-26_04_2011-17_29_29.ljson.gz',))
+    process(('../../data/tweet_u-12_05_2011-10_02_31.ljson.gz',))
     #gen_urls('../../data/list/web_rd2.lst', \
             #('../../data/websearch_b-16_05_2011-13_08_04.ljson.gz',))
-    im_webpage(('../../data/web-17_05_2011-16_23_37.ljson.gz',))
+    #im_webpage(('../../data/web-17_05_2011-16_23_37.ljson.gz',))
             #'../../data/web-06_05_2011-10_29_43.ljson.gz'))
 
 
