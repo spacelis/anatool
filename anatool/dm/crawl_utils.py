@@ -113,8 +113,8 @@ def im_tweet(srcs):
                         'VALUES(%s,%s,%s,%s,%s,%s,'
                         'GeomFromText(\'POINT({0} {1})\'),%s)'. \
                         format(lat, lng), item)
-            cur.execute('INSERT INTO tweet_json(id, json) VALUES(%s,%s)',
-                    (tjson['id'], line))
+                #cur.execute('INSERT INTO tweet_json(id, json) VALUES(%s,%s)',
+                    #(tjson['id'], line))
             i += 1
         except _mysql_exceptions.IntegrityError:
             print 'Import Tweets::Tweet ID {0} ignored for duplication.'\

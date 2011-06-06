@@ -38,7 +38,7 @@ class LanguageModel(DataItem):
             dgc += p * math.log(p / q)
         return dgc
 
-    def score(self, lm):
+    def score(self, lm, **kargs):
         """ Return KL-divergences as scores
         """
         return LanguageModel.kl_divergence(lm, self)
@@ -54,7 +54,7 @@ class TermSetModel(set):
     def __init__(self, text):
         super(TermSetModel, self).__init__(bgdist(f_tf(text)))
 
-    def score(self, tms):
+    def score(self, tms, **kargs):
         """ Return |self n tms| / |self U tms|
         """
         return len(self & tms) / float(len(self | tms))
@@ -71,7 +71,7 @@ class BiasTermSetModel(TermSetModel):
     def __init__(self, text):
         super(BiasTermSetModel, self).__init__(text)
 
-    def score(self, tms):
+    def score(self, tms, **kargs):
         """ Return |self n tms| / |self U tms|
         """
         return len(self & tms) / float(len(self))

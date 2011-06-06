@@ -17,6 +17,7 @@ from operator import itemgetter
 from anatool.dm.db import CONN_POOL, GEOTWEET
 from anatool.analyze.dataset import Dataset, place_name, loadrows
 from anatool.analyze.lm import lmfromtext, kl_divergence
+from anatool.analyze.rank import ranke
 
 
 #--------------------------------------------------------------- setups
@@ -125,7 +126,7 @@ def sparsitysetup(nums):
                     lmtwt.append({'pid': pid, 'lm': lmfromtext([txt,])})
             ranks = list()
             for item in lmtwt:
-                ranks.append(kl_ranking(lmplc, item['lm']))
+                ranks.append(ranke(lmplc, item['lm']))
             gch = batcheval(lmtwt['pid'], len(places), ranks)
             plt.plot(gch['pos'], gch['rate'],
                     lsts.next(), label='t={0}'.format(num))

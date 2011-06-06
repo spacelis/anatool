@@ -33,17 +33,22 @@ class TimeModel(object):
         self.wdaydist = norm_v1(self.wdaydist)
         self.mdaydist = norm_v1(self.mdaydist)
 
-    def score(self, tm):
+    def score(self, tm, **kargs):
         """ score is based on the distribution of the tick in period dimension
         """
         hs, ws, ms = 0.0, 0.0, 0.0
         for i in range(6):
             hs += self.hourdist[i] * tm.hourdist[i]
             ws += self.wdaydist[i] * tm.wdaydist[i]
-        for i in range(31):
+        for i in range(32):
             ms += self.mdaydist[i] * tm.mdaydist[i]
 
-        return 0.4 * hs + 0.4 * ws + 0.2 * ms
+        if 'balance' not in kargs:
+            return 0.4*hs + 0.4*ws + 0.2*ms
+
+        return kargs['balance'][0] * hs \
+                + kargs['balance'][1] * ws \
+                + kargs['balance'][2] * ms
 
     def isasc(self):
         """ Return 0 indicating the larger the more similar

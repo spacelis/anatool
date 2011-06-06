@@ -9,6 +9,7 @@ History:
 __version__ = '0.1.0'
 __author__ = 'SpaceLis'
 
+import random
 from operator import itemgetter
 from anatool.dm.dataset import Dataset
 
@@ -27,7 +28,7 @@ def unitscore(vector):
 
 #--------------------------------------------------------------- Experiment
 
-def ranke(cand, ref):
+def ranke(cand, ref, **kargs):
     """ Rank the models in cand according to the scoring methods in the models
         @arg cand dict() of (label, model)
         @arg ref model for testing
@@ -35,12 +36,26 @@ def ranke(cand, ref):
     """
     rak = list()
     for lbl in cand.iterkeys():
-        rak.append((lbl, cand[lbl].score(ref)))
+        rak.append((lbl, cand[lbl].score(ref, **kargs)))
     rak = sorted(rak, key=itemgetter(1), reverse=not ref.isasc())
     res = Dataset()
     for item in rak:
         res.append({'label': item[0], 'score': item[1]})
     return res
+
+def randranke(cand):
+    """ Return a random sorted cand
+    """
+    rak = list()
+    for lbl in cand:
+        rak.append((lbl, random.random()))
+    rak = sorted(rak, key=itemgetter(1))
+    res = Dataset()
+    for item in rak:
+        res.append({'label': item[0], 'score': item[1]})
+    return res
+
+
 
 def linearjoin(ranks, balance):
     """ Join a set of ranks by the weights in balance
@@ -57,7 +72,7 @@ def linearjoin(ranks, balance):
     for idx in range(len(sortedranks[0])):
         unitrank.append((sortedranks[0][idx]['label'],
             sum([score * bl for score, bl in \
-                    zip([sortedranks[i][idx]['score'] for i in range(len(sortedranks))],
+                zip([sortedranks[i][idx]['score'] for i in range(len(sortedranks))],
                         balance)])))
     unitrank = sorted(unitrank, key=itemgetter(1), reverse=False)
     res = Dataset()
