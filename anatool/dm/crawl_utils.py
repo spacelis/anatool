@@ -19,12 +19,13 @@ import traceback
 import _mysql_exceptions
 import MySQLdb
 import warnings
+from operator import itemgetter
 
 from annotation import LogFunction
 from anatool.dm.db import GEOTWEET, CONN_POOL
-from anatool.analyze.dataset import loadrows
-from anatool.analyze.text_util import html_filter, isreadable
-from anatool.analyze.feature import get_tokens
+from anatool.dm.dataset import loadrows
+from anatool.analysis.text_util import html_filter, isreadable
+from anatool.analysis.feature import get_tokens
 
 def named(name, ext):
     """rename the file if there is a file in the same name
@@ -447,6 +448,27 @@ def im_webpage(srcs):
     logging.info('Import web pages::{0} out of {1} imported.'.format(i, k))
     logging.info('------------------------------------------')
 
+@LogFunction('Sorting Logs')
+def sortlog(dst, src):
+    """ Sort log by line number
+    """
+    loglist = list()
+    with open(src) as flog:
+        for line in flog:
+            st = line.find('[')
+            if st>=0:
+                st += 1
+            else:
+                continue
+            ed = line.find(']', st)
+            lno = int(line[st:ed])
+            loglist.append((lno, line))
+    loglist = sorted(loglist, key=itemgetter(0))
+    with open(dst, 'w') as fdst:
+        for item in loglist:
+            print >>fdst, item[1].strip()
+
+
 if __name__ == '__main__':
 
     logging.basicConfig( \
@@ -462,9 +484,10 @@ if __name__ == '__main__':
     #process(('../data/tweet-26_04_2011-17_29_29.ljson.gz',))
     #gen_urls('../../data/list/web_rd2.lst', \
             #('../../data/websearch_b-16_05_2011-13_08_04.ljson.gz',))
-    im_webpage(('../../data/web-17_05_2011-16_23_37.ljson.gz',))
+    #im_webpage(('../../data/web-17_05_2011-16_23_37.ljson.gz',))
             #'../../data/web-06_05_2011-10_29_43.ljson.gz'))
 
+    sortlog('../../data/sort.txt', '../../data/log.txt')
 
 
 
