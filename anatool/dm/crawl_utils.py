@@ -487,11 +487,7 @@ if __name__ == '__main__':
     #im_webpage(('../../data/web-17_05_2011-16_23_37.ljson.gz',))
             #'../../data/web-06_05_2011-10_29_43.ljson.gz'))
 
-    sortlog('../../data/sort.txt', '../../data/log.txt')
-
-
-
-
+    #sortlog('../../data/sort.txt', '../../data/log.txt')
 
     #filter_poi('../data/poi_rd15.ljson', \
             #('../data/tweet_g-15_04_2011-14_51_39.ljson.gz', ))
