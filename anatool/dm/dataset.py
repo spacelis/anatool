@@ -236,7 +236,7 @@ def qloadrows(config, query):
 def place_name(pid, dbconf=GEOTWEET):
     """Return place name given a pid"""
     cur = CONN_POOL.get_cur(dbconf)
-    cur.execute("select name from place where id=%s", pid)
+    cur.execute("select name from place where id=%s", (pid,))
     return cur.fetchone()['name']
 
 def city_random(pid, cnt=10000):

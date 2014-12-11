@@ -17,7 +17,8 @@ GEOSTREAM = {'host':'localhost', \
 GEOTWEET = {'host':'localhost', \
             'user' :'root', \
             'passwd' : '', \
-            'db' : 'geotweet', \
+            'unix_socket': '/tmp/mariadb.sock',
+            'db' : 'geostream', \
             'charset' : 'utf8', \
             'use_unicode' : False}
 
