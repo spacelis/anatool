@@ -10,7 +10,7 @@ __author__ = 'SpaceLis'
 
 import re
 
-_PATTERN_4SQ = [ re.compile(r'\sSt\.\s|\sRd\.\s'),
+_PATTERN_4SQ = [re.compile(r'\sSt\.\s|\sRd\.\s'),
                 re.compile(r'I\'m at.*?(?<!.\.\w|.\s\w)\.\s+'),
                 re.compile(r'I\'m at.*?\s(?=http)'),
                 re.compile(r'http://\S*'),
