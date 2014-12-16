@@ -14,9 +14,12 @@ __version__ = '0.2.4'
 __author__ = 'SpaceLis'
 
 import random, csv
+import re
 from anatool.dm.db import CONN_POOL, GEOTWEET
 from anatool.analysis.text_util import geo_rect
 from annotation import Cache
+
+IDPTN = re.compile(r'[a-z0-9]+')
 
 #---------------------------------------------------------- List Operators
 def rand_select(cnt, ratio):
@@ -76,6 +79,7 @@ class Dataset(dict):
         """
         for item in itemlist:
             self.append(item)
+        return self
 
     def distinct(self, key):
         """Return the value set of the key
@@ -230,11 +234,14 @@ def qloadrows(config, query):
     cur = CONN_POOL.get_cur(config)
     print query
     cur.execute(query)
+    print 'Count: {0}'.format(cur.rowcount)
     return Dataset().extend([row for row in cur])
 
 @Cache()
 def place_name(pid, dbconf=GEOTWEET):
     """Return place name given a pid"""
+    if IDPTN.match(pid) is None:
+        return pid
     cur = CONN_POOL.get_cur(dbconf)
     cur.execute("select name from place where id=%s", (pid,))
     return cur.fetchone()['name']
