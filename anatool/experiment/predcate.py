@@ -110,6 +110,10 @@ def cmptimeweb(cities, numtwts, numtest):
         #     print place_name(plc), plc
         # print 'Place Total Rank:'
         # print placetotalrank(wmlmranks[i], test)['totalrank'][-10:]
+
+    plt.plot(lmeval['pos'], [float(r) / max(lmeval['pos']) for r in lmeval['pos']],
+             ls='-.', marker='s',
+             label='Random Baseline')
     # wmeval = batcheval(wmranks, test['label'])
     # print 'Place id -> name:'
     # for plc in placetotalrank(wmranks, test)['label'][-10:]:

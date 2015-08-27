@@ -97,6 +97,9 @@ def onesetup(places, numtwts, numtest, balance):
         webranks.append(kl_ranking(lmweb, lmfromtext([item['text'],])))
     gweb = batcheval(twttest['place_id'], len(places), webranks)
     plt.plot(gweb['pos'], gweb['rate'], label='WEB', linestyle='dotted')
+    plt.plot(lmeval['pos'], [float(r) / max(lmeval['pos']) for r in lmeval['pos']],
+             ls='-.', marker='s',
+             label='Random Baseline')
     plt.xlabel('First $n$ Places')
     plt.ylabel('Probability')
     plt.legend(loc='lower right')

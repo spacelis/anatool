@@ -112,6 +112,10 @@ def cmptimeweb(cities, numtwts, numtest):
     plt.plot(wmeval['pos'], wmeval['rate'],
             label='web',
             ls=':')
+
+    plt.plot(lmeval['pos'], [float(r) / max(lmeval['pos']) for r in lmeval['pos']],
+             ls='-.', marker='s',
+             label='Random Baseline')
 #---------------------------------------------------------------
 
 
@@ -274,6 +278,9 @@ def cmpsparsecombine(cities, numtwts, numtest):
     print placetotalrank(lmtmranks[i], test)['totalrank'][-10:]
     print wilcoxontest(lmranks[i], lmtmranks[i], test)
 
+    plt.plot(lmeval['pos'], [float(r) / max(lmeval['pos']) for r in lmeval['pos']],
+             ls='-.', marker='s',
+             label='Random Baseline')
     plt.legend(loc='lower right')
     plt.ylabel('Rate containing Reference POI')
     plt.xlabel('Top $p$ places')
@@ -303,6 +310,9 @@ def cmpsparsecombine(cities, numtwts, numtest):
     print placetotalrank(wmlmtmranks[i], test)['totalrank'][-10:]
     print wilcoxontest(wmlmranks[i], wmlmtmranks[i], test)
 
+    plt.plot(lmeval['pos'], [float(r) / max(lmeval['pos']) for r in lmeval['pos']],
+             ls='-.', marker='s',
+             label='Random Baseline')
     plt.legend(loc='lower right')
     plt.ylabel('Rate containing Reference POI')
     plt.xlabel('Top $p$ places')
@@ -351,6 +361,9 @@ def cmpsparse(cities, numtwts, numtest):
                 label='tweet(s={0})'.format(n),
                 marker=mks[i])
 
+    plt.plot(lmeval['pos'], [float(r) / max(lmeval['pos']) for r in lmeval['pos']],
+             ls='-.', marker='s',
+             label='Random Baseline')
     plt.legend(loc='lower right')
     plt.ylabel('Rate containing Reference POI')
     plt.xlabel('Top $p$ places')
@@ -380,10 +393,12 @@ def richrank(cities, names):
             randranks.append(randranke(cities[idx]))
 
         lmeval = batcheval(lmranks, test['label'])
-        randeval = batcheval(randranks, test['label'])
-        print names[idx], 'P@1', (lmeval['rate'][1] - randeval['rate'][1])
+        print names[idx], 'P@1', (lmeval['rate'][1] - 0.1)
         plt.plot(lmeval['pos'], lmeval['rate'], ls=candls[idx%2], marker=mks[idx/2],
                 label='{0}($s=100$)'.format(names[idx]))
+    plt.plot(lmeval['pos'], [float(r) / max(lmeval['pos']) for r in lmeval['pos']],
+             ls='-.', marker='s',
+             label='Random Baseline')
     plt.legend(loc='lower right')
     plt.ylabel('Rate containing referece POI')
     plt.xlabel('Top $p$ places')
@@ -408,8 +423,9 @@ def run():
         with open('data/' + city) as fin:
             cities.append([p.strip() for p in fin])
     # cmpsparse(cities, [100, 25, 10, 5], 10)
-    # cmpsparseN(cities, [100, 5], 10)
-    richrank(cities, ['Chicago', 'Los Angeles', 'New York', 'San Francisco'])
+    # cmpsparsecombine(cities, [100, 5], 10)
+    cmptimeweb(cities, [100, 5], 10)
+    # richrank(cities, ['Chicago', 'Los Angeles', 'New York', 'San Francisco'])
 
 if __name__ == '__main__':
     run()
