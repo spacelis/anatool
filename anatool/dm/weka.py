@@ -11,8 +11,8 @@ __author__ = 'SpaceLis'
 
 import re, random
 from anatool.dm.db import CONN_POOL, GEOTWEET
-from anatool.analyze.dataset import loadrows, Dataset, DataItem, list_split
-from anatool.analyze.text_util import geo_rect
+from anatool.dm.dataset import loadrows, Dataset, DataItem, list_split
+from anatool.analysis.text_util import geo_rect
 
 _SPACE = re.compile(r'\s+')
 _SYMBOL = re.compile(r'\+|\*')

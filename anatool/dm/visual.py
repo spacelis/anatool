@@ -20,6 +20,18 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import pymaps
 
+import seaborn as sns
+sns.set_palette("deep", desat=.6)
+sns.set_style("white")
+sns.set_context(font_scale=1.5, rc={"figure.figsize": (3, 2), 'axes.grid': False, 'axes.linewidth': 1,})
+
+
+def cnt_poi(city, table='sample'):
+    """ Draw the tweet distribution over POIs."""
+    twt_lst = dataset.loadrows(GEOTWEET, ('place_id', 'count(id) as cnt'),
+                               "superior_id='%s'" % (city), table, 'group by place_id')
+
+
 def cnt_map(region, table = 'sample', draw = True):
     """Draw a region map of tweets"""
     twt_lst = dataset.loadrows(GEOTWEET, ('lat', 'lng'),
@@ -183,4 +195,5 @@ if __name__ == '__main__':
     #top_poi100_map()
     #region_dist('manhatton.html', ((40.75, -74.00), (40.745, -73.995)))
     #time_plot('../data/list/38062252_time.csv')
-    time_plot('ee858ad43eb4072e')
+    # time_plot('ee858ad43eb4072e')
+    cnt_poi()

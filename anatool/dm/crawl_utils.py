@@ -15,13 +15,17 @@ __version__ = '0.1.5'
 __author__ = 'SpaceLis'
 
 import json, re, logging, fileinput, gzip, time, os, sys
-import _mysql_exceptions
 import traceback
-from anatool.dm.log_helper import LogFunction
+import _mysql_exceptions
+import MySQLdb
+import warnings
+from operator import itemgetter
+
+from annotation import LogFunction
 from anatool.dm.db import GEOTWEET, CONN_POOL
-from anatool.analyze.dataset import loadrows
-from anatool.analyze.text_util import html_filter
-from anatool.analyze.feature import get_tokens
+from anatool.dm.dataset import loadrows
+from anatool.analysis.text_util import html_filter, isreadable
+from anatool.analysis.feature import get_tokens
 
 def named(name, ext):
     """rename the file if there is a file in the same name
@@ -110,8 +114,8 @@ def im_tweet(srcs):
                         'VALUES(%s,%s,%s,%s,%s,%s,'
                         'GeomFromText(\'POINT({0} {1})\'),%s)'. \
                         format(lat, lng), item)
-            cur.execute('INSERT INTO tweet_json(id, json) VALUES(%s,%s)',
-                    (tjson['id'], line))
+                #cur.execute('INSERT INTO tweet_json(id, json) VALUES(%s,%s)',
+                    #(tjson['id'], line))
             i += 1
         except _mysql_exceptions.IntegrityError:
             print 'Import Tweets::Tweet ID {0} ignored for duplication.'\
@@ -409,7 +413,7 @@ def gen_urls(dst, srcs):
     for line in fileinput.input(srcs, openhook = fileinput.hook_compressed):
         jlist = json.loads(line)
         for entry in jlist['gresults']:
-            print >> fdst, u'$'.join((jlist['q'], entry['Url'])).encode('utf-8')
+            print >> fdst, '$'.join((jlist['q'], entry['Url'])).encode('utf-8')
             k += 1
     print '{0} URLs generated'.format(k)
     fdst.close()
@@ -420,14 +424,19 @@ def im_webpage(srcs):
     """ Import web pages from file to database.
     """
     # Connect to MySQL database
+    warnings.simplefilter("error", MySQLdb.Warning)
     cur = CONN_POOL.get_cur(GEOTWEET)
     i, k = 0, 0
     for line in fileinput.input(srcs, openhook = fileinput.hook_compressed):
         try:
             k += 1
             tjson = json.loads(line)
-            item = (tjson['q'], \
-                    html_filter(tjson['web']))
+            text = tjson['web']
+            if not isreadable(text):
+                print text[:80].encode('cp1252', errors='ignore')
+                continue
+            item = (tjson['place_id'], \
+                    html_filter(text).encode('utf-8', errors='ignore'))
             cur.execute('INSERT INTO web ( \
                     place_id, \
                     web) \
@@ -438,6 +447,27 @@ def im_webpage(srcs):
             print traceback.print_exc(file=sys.stdout)
     logging.info('Import web pages::{0} out of {1} imported.'.format(i, k))
     logging.info('------------------------------------------')
+
+@LogFunction('Sorting Logs')
+def sortlog(dst, src):
+    """ Sort log by line number
+    """
+    loglist = list()
+    with open(src) as flog:
+        for line in flog:
+            st = line.find('[')
+            if st>=0:
+                st += 1
+            else:
+                continue
+            ed = line.find(']', st)
+            lno = int(line[st:ed])
+            loglist.append((lno, line))
+    loglist = sorted(loglist, key=itemgetter(0))
+    with open(dst, 'w') as fdst:
+        for item in loglist:
+            print >>fdst, item[1].strip()
+
 
 if __name__ == '__main__':
 
@@ -452,15 +482,12 @@ if __name__ == '__main__':
 
     # running scripts
     #process(('../data/tweet-26_04_2011-17_29_29.ljson.gz',))
-    #gen_urls('../data/list/web_rd1.lst', \
-            #('../data/websearch_b-28_04_2011-15_47_28.ljson',))
-    #im_webpage(('../../data/web_f.ljson',
+    #gen_urls('../../data/list/web_rd2.lst', \
+            #('../../data/websearch_b-16_05_2011-13_08_04.ljson.gz',))
+    #im_webpage(('../../data/web-17_05_2011-16_23_37.ljson.gz',))
             #'../../data/web-06_05_2011-10_29_43.ljson.gz'))
 
-
-
-
-
+    #sortlog('../../data/sort.txt', '../../data/log.txt')
 
     #filter_poi('../data/poi_rd15.ljson', \
             #('../data/tweet_g-15_04_2011-14_51_39.ljson.gz', ))

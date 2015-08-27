@@ -10,13 +10,13 @@ __version__ = '0.1.0'
 __author__ = 'SpaceLis'
 
 import math
-from anatool.analyze.dataset import DataItem, Dataset
-from anatool.analyze.text_util import to_unicode, fourq_filter
+from anatool.dm.dataset import DataItem, Dataset
+from anatool.analysis.text_util import to_unicode, fourq_filter
 
 from whoosh.analysis import StemmingAnalyzer, StandardAnalyzer
 _ANALYZER = StemmingAnalyzer()
 # Alternative analyzer could be used
-#from anatool.analyze.stopwords import STOPWORDS_RANKSNL_LONG
+#from anatool.analysis.stopwords import STOPWORDS_RANKSNL_LONG
 #_ANALYZER = StandardAnalyzer(stoplist = STOPWORDS_RANKSNL_LONG)
 
 def get_tokens(line):

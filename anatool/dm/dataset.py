@@ -2,18 +2,24 @@
 Description:
 This module contains all the data model used in analysis
 History:
+    0.2.4: ! fix bugs in writecsv
+    0.2.3: + csv output for Dataset
     0.2.2: + Dataset, DataItem classes
     0.2.1: add lots of things
     0.1.1: Add class DataColumnIterator
     0.1.0: The first version
 """
 
-__version__ = '0.2.2'
+__version__ = '0.2.4'
 __author__ = 'SpaceLis'
 
-import random, json
+import random, csv
+import re
 from anatool.dm.db import CONN_POOL, GEOTWEET
-from anatool.analyze.text_util import geo_rect
+from anatool.analysis.text_util import geo_rect
+from annotation import Cache
+
+IDPTN = re.compile(r'[a-z0-9]+')
 
 #---------------------------------------------------------- List Operators
 def rand_select(cnt, ratio):
@@ -47,23 +53,25 @@ class Dataset(dict):
     """
     def __init__(self, *arg, **karg):
         super(Dataset, self).__init__(*arg, **karg)
-        self._size = 0
         self.sortedkey = None
 
     def size(self):
         """the size of the dataset, i.e., the number of rows
         """
-        return self._size
+        if len(self) == 0:
+            return 0
+        return len(self.itervalues().next())
 
     def append(self, item):
         """Add a new data item into the dataset
         This is just for mocking list().append()
         """
+        _size = self.size()
         for key in item.iterkeys():
             if key not in self:
-                self[key] = [0 for idx in range(0, self._size)]
+                # TODO add default values for unseen key
+                self[key] = [0 for idx in range(_size)]
             self[key].append(item[key])
-        self._size += 1
 
     def extend(self, itemlist):
         """Extend the dataset with the itemlist
@@ -71,6 +79,7 @@ class Dataset(dict):
         """
         for item in itemlist:
             self.append(item)
+        return self
 
     def distinct(self, key):
         """Return the value set of the key
@@ -80,14 +89,18 @@ class Dataset(dict):
             vset.add(val)
         return [val for val in vset]
 
+    def sorted_items(self, key):
+        """ Access the sequence of items in sorted manner based on key
+        """
+        indices = sorted(range(self.size()), key=lambda x:self[key][x])
+        for idx in indices:
+            yield self.item(idx)
+
     def groupfunc(self, key, pkey, func):
         """Return the output of a function to the values grouped by key
         """
         rst = DataItem()
-        if self.sortedkey == key:
-            indices = range(0, self._size)
-        else:
-            indices = sorted(indices, key=lambda x:self[key][x])
+        indices = sorted(range(self.size), key=lambda x:self[key][x])
         temp = list()
         idx_val = type(self[key][0]).__init__()
         for idx in indices:
@@ -103,7 +116,7 @@ class Dataset(dict):
     def merge(self, dset):
         """Merge the keys and values into this Dataset
         """
-        if self._size != dset._size:
+        if self.size() != dset.size():
             raise TypeError, "size doesn't match"
         for key in dset.iterkeys():
             if key not in self:
@@ -119,10 +132,56 @@ class Dataset(dict):
             rst[key] = self[key][idx]
         return rst
 
+    def writecsv(self, filename, **kargs):
+        """ write this dataset into a csv file
+            @arg filename the path to the csv file
+            @kargs headers whether the output include headers
+            @kargs transposed whether output in the transposed manner
+            @kargs delimiter the delimiter used in csv file
+            @kargs quotechar the quotechar used in csv file
+        """
+        _kargs = {
+                'headers': True,
+                'transposed' : False,
+                'delimiter' : ';',
+                'quotechar' : '`'}
+        _kargs.update(kargs)
+
+        keys = [key for key in self.iterkeys()]
+        with open(filename, 'wb') as fout:
+            csvwriter = csv.writer(fout, delimiter=_kargs['delimiter'],
+                    quotechar=_kargs['quotechar'])
+            if not _kargs['transposed']:
+                if _kargs['headers']:
+                    csvwriter.writerow([key for key in keys])
+                for item in self:
+                    csvwriter.writerow([item[key] for key in keys])
+            else:
+                for key in keys:
+                    csvwriter.writerow([key, ] if _kargs['headers'] else list() \
+                            + self[key])
+    @classmethod
+    def readcsv(filename, **kargs):
+        """read from a csv file
+            @arg filename the path to the csv file
+            @kargs headers whether the output include headers
+            @kargs transposed whether output in the transposed manner
+            @kargs delimiter the delimiter used in csv file
+            @kargs quotechar the quotechar used in csv file
+        """
+        _kargs = {
+                'headers': True,
+                'transposed' : False,
+                'delimiter' : ';',
+                'quotechar' : '`'}
+        _kargs.update(kargs)
+        #TODO finish read from a csv file
+
+
     def __iter__(self):
         """Iterating items in the dataset
         """
-        for idx in range(self._size):
+        for idx in range(self.size()):
             yield self.item(idx)
 
 class PartialIterator(object):
@@ -157,7 +216,7 @@ def loadrows(config, cols, wheres=None, table='sample', other=''):
             ((', '.join(cols)) if cols!='*' else '*') \
             + ' FROM ' + table + \
             ((' WHERE ' + ' AND '.join(wheres)) if wheres else '') \
-            + other
+            + ' ' + other
     cur = CONN_POOL.get_cur(config)
     print query
     cur.execute(query)
@@ -175,12 +234,16 @@ def qloadrows(config, query):
     cur = CONN_POOL.get_cur(config)
     print query
     cur.execute(query)
+    print 'Count: {0}'.format(cur.rowcount)
     return Dataset().extend([row for row in cur])
 
-def place_name(pid, dbconf):
+@Cache()
+def place_name(pid, dbconf=GEOTWEET):
     """Return place name given a pid"""
+    if IDPTN.match(pid) is None:
+        return pid
     cur = CONN_POOL.get_cur(dbconf)
-    cur.execute("select name from place where id=%s", pid)
+    cur.execute("select name from place where id=%s", (pid,))
     return cur.fetchone()['name']
 
 def city_random(pid, cnt=10000):
@@ -223,5 +286,6 @@ if __name__ == '__main__':
     #{'id':'b', 'val':1}, {'id':'a', 'val':2}])
     #print d
     #print d.groupfunc('id', len)
-    print list_split([1,2,3,4,5,6,7,8,9], 4)
+    #print list_split([1,2,3,4,5,6,7,8,9], 4)
+    print place_name('0007a1bd373a2805')
 

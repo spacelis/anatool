@@ -10,7 +10,7 @@ __author__ = 'SpaceLis'
 
 import re
 
-_PATTERN_4SQ = [ re.compile(r'\sSt\.\s|\sRd\.\s'),
+_PATTERN_4SQ = [re.compile(r'\sSt\.\s|\sRd\.\s'),
                 re.compile(r'I\'m at.*?(?<!.\.\w|.\s\w)\.\s+'),
                 re.compile(r'I\'m at.*?\s(?=http)'),
                 re.compile(r'http://\S*'),
@@ -28,6 +28,7 @@ _HTML = [re.compile(r'<style.*?</style>'),
 
 _ASIANCHAR = re.compile(u'[\u2E80-\u9FFF]')
 
+_ENGLISHCHAR = set('abcdefghijklmnopqrstuvwxyz ')
 
 
 #------------------------------------------------------ Filters
@@ -79,6 +80,20 @@ def to_unicode(obj, encoding = 'utf-8'):
 def has_asianchar(line):
     """Return True if the line contains some Asian characters"""
     return _ASIANCHAR.search(line) != None
+
+def isreadable(line):
+    """ Check whether the line contains meaningful words
+    """
+    eng_count = 0
+    runlength = min(len(line), 1000)
+    for i in range(runlength):
+        if line[i] in _ENGLISHCHAR:
+            eng_count += 1
+    if eng_count > runlength * 0.5:
+        return True
+    return False
+
+
 
 def geo_rect(pnt1, pnt2):
     """Generate geo string (Rectangle) for mysql"""
